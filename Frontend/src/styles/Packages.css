@@ -1,0 +1,20 @@
+
+.card {
+  margin-bottom: 0.5rem;
+}
+
+.btn {
+  margin-right: 0.5rem;
+}
+
+.mt-4 {
+  margin-top: 0.5rem !important;
+}
+
+.btn {
+  transition: none !important; 
+}
+
+.btn:focus {
+  outline: none !important;
+}
