@@ -2,7 +2,7 @@
 FROM node:20-slim AS frontend-build
 WORKDIR /app/frontend
 COPY app/Frontend/package*.json ./
-RUN npm ci
+RUN npm install
 COPY app/Frontend/ .
 RUN npm run build
 
@@ -10,7 +10,7 @@ RUN npm run build
 FROM node:20-slim AS backend-build
 WORKDIR /app/backend
 COPY app/Backend/package*.json ./
-RUN npm ci
+RUN npm install
 COPY app/Backend/ .
 
 # Stage 3: Serve the frontend
