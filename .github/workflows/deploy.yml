@@ -8,47 +8,120 @@ on:
 jobs:
   build-deploy:
     runs-on: self-hosted
+    env:
+      DOCKER_BUILDKIT: 1
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Check environment
+      run: |
+        echo "Workspace directory:"
+        pwd
+        ls -la
+        echo "Docker version:"
+        docker version
+        echo "Minikube status:"
+        minikube status
+        echo "Kubernetes version:"
+        kubectl version
+        echo "Current user:"
+        whoami
+        echo "User groups:"
+        groups
+
     - name: Set up Docker to use Minikube's environment
       run: |
         echo "Configuring Docker to use Minikube's daemon..."
         eval $(minikube docker-env)
+        docker info
 
     - name: Build Frontend Docker image
       run: |
-        docker build -t saim814/gym-frontend:latest --target frontend .
+        echo "Building frontend image..."
+        docker build --progress=plain -t saim814/gym-frontend:latest --target frontend . || {
+          echo "Frontend build failed"
+          exit 1
+        }
         
     - name: Build Backend Docker image
       run: |
-        docker build -t saim814/gym-backend:latest --target backend .
+        echo "Building backend image..."
+        docker build --progress=plain -t saim814/gym-backend:latest --target backend . || {
+          echo "Backend build failed"
+          exit 1
+        }
+
+    - name: Verify Docker images
+      run: |
+        echo "Listing Docker images:"
+        docker images | grep saim814
 
     - name: Login to Docker Hub
-      run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      run: |
+        if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
+          echo "Error: DOCKER_USERNAME secret is not set"
+          exit 1
+        fi
+        if [ -z "${{ secrets.DOCKER_PASSWORD }}" ]; then
+          echo "Error: DOCKER_PASSWORD secret is not set"
+          exit 1
+        fi
+        echo "Logging in to Docker Hub..."
+        echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
     - name: Push Docker images to Docker Hub
       run: |
-        docker push saim814/gym-frontend:latest
-        docker push saim814/gym-backend:latest
+        echo "Pushing images to Docker Hub..."
+        docker push saim814/gym-frontend:latest || {
+          echo "Frontend push failed"
+          exit 1
+        }
+        docker push saim814/gym-backend:latest || {
+          echo "Backend push failed"
+          exit 1
+        }
 
-    - name: Update kube config
+    - name: Verify Kubernetes context
       run: |
-        minikube update-context
+        echo "Current Kubernetes context:"
+        kubectl config current-context
+        echo "Available nodes:"
+        kubectl get nodes
 
     - name: Create MongoDB URI Secret
       run: |
+        if [ -z "${{ secrets.MONGO_URI }}" ]; then
+          echo "Error: MONGO_URI secret is not set"
+          exit 1
+        fi
+        echo "Creating MongoDB secret..."
+        kubectl create namespace gym-system --dry-run=client -o yaml | kubectl apply -f -
         kubectl create secret generic mongodb-uri --from-literal=MONGO_URI="${{ secrets.MONGO_URI }}" -n gym-system --dry-run=client -o yaml | kubectl apply -f -
 
     - name: Deploy to Minikube
       run: |
-        kubectl apply -f deployment.yaml -n gym-system
-        kubectl apply -f service.yaml -n gym-system
+        echo "Deploying to Minikube..."
+        kubectl apply -f deployment.yaml -n gym-system || {
+          echo "Deployment failed"
+          kubectl describe deployment -n gym-system
+          exit 1
+        }
+        kubectl apply -f service.yaml -n gym-system || {
+          echo "Service deployment failed"
+          kubectl describe service -n gym-system
+          exit 1
+        }
 
     - name: Verify deployment
       run: |
+        echo "Verifying deployment..."
         kubectl get pods -n gym-system
         kubectl get services -n gym-system
-        kubectl get deployments -n gym-system 
+        kubectl get deployments -n gym-system
+        echo "Checking pod logs:"
+        for pod in $(kubectl get pods -n gym-system -o jsonpath='{.items[*].metadata.name}'); do
+          echo "Logs for $pod:"
+          kubectl logs $pod -n gym-system --all-containers || true
+        done 
