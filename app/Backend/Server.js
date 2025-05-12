@@ -8,13 +8,12 @@ const trainerRoutes = require('./Routes/trainerRoutes');
 const traineeRoutes = require('./Routes/traineeRoutes');
 const packageRoutes = require('./Routes/packageRoutes');
 const paymentRoutes = require('./Routes/paymentRoutes');
+require('dotenv').config();
 
 const app = express();
 const PORT = 5000;
 
-mongoose.connect('mongodb://localhost:27017/gymManagement', {
-
-})
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true }) // Use MONGO_URI from .env
   .then(() => console.log('Connected to MongoDB'))
   .catch((error) => console.error('Error connecting to MongoDB:', error));
 

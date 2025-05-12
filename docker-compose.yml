@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      target: frontend
+    ports:
+      - "3000:80"
+    container_name: gym-frontend
+
+  backend:
+    build:
+      context: .
+      target: backend
+    ports:
+      - "5000:5000"
+    container_name: gym-backend
+    environment:
+      - MONGO_URI=${MONGO_URI}
