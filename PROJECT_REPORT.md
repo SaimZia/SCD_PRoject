@@ -136,6 +136,104 @@ node_modules/
 kubectl create secret generic mongodb-uri --from-literal=MONGO_URI=<connection_string>
 ```
 
+### MongoDB Configuration and Troubleshooting
+
+1. Create MongoDB Atlas Account and Database:
+   - Sign up for MongoDB Atlas
+   - Create a new cluster
+   - Create a database user
+   - Get your connection string
+
+2. Configure MongoDB in Kubernetes:
+   ```bash
+   # Create MongoDB connection secret
+   kubectl create secret generic mongodb-uri \
+     --from-literal=MONGO_URI="mongodb+srv://<username>:<password>@<cluster-url>/<database>?retryWrites=true&w=majority" \
+     -n gym-system
+   ```
+
+3. Common Issues and Solutions:
+
+   a. **Missing MongoDB Secret Error**
+   ```bash
+   # Symptom: Pods show CreateContainerConfigError
+   kubectl get pods -n gym-system
+   # Output shows: CreateContainerConfigError
+   
+   # Check pod details
+   kubectl describe pod -n gym-system
+   # Error message: "secret "mongodb-uri" not found"
+   
+   # Solution: Create the MongoDB secret
+   kubectl create secret generic mongodb-uri \
+     --from-literal=MONGO_URI="your-mongodb-connection-string" \
+     -n gym-system
+   
+   # Restart the deployment
+   kubectl rollout restart deployment gym-management-system -n gym-system
+   
+   # Wait for pods to be ready
+   kubectl wait --for=condition=ready pod -l app=gym-management-system -n gym-system --timeout=180s
+   ```
+
+   b. **Service Unreachable Error**
+   ```bash
+   # Symptom: Service unreachable error when accessing URLs
+   minikube service gym-management-service -n gym-system
+   # Error: "service not available: no running pod for service"
+   
+   # Solution steps:
+   # 1. Check pod status
+   kubectl get pods -n gym-system
+   
+   # 2. Verify MongoDB secret exists
+   kubectl get secrets -n gym-system
+   
+   # 3. Check service configuration
+   kubectl get svc gym-management-service -n gym-system
+   
+   # 4. Get service URLs
+   minikube service gym-management-service -n gym-system --url
+   # Frontend URL: http://<minikube-ip>:31008
+   # Backend API URL: http://<minikube-ip>:31007
+   ```
+
+### Quick Verification Steps
+
+1. Verify all components are running:
+   ```bash
+   # Check pods
+   kubectl get pods -n gym-system
+   # Should show: 2/2 READY and Running status
+   
+   # Check services
+   kubectl get svc -n gym-system
+   # Should show: gym-management-service with NodePort
+   
+   # Check secrets
+   kubectl get secrets -n gym-system
+   # Should show: mongodb-uri secret
+   ```
+
+2. Access the application:
+   ```bash
+   # Get service URLs
+   minikube service gym-management-service -n gym-system --url
+   
+   # Expected output:
+   # http://<minikube-ip>:31007 (Backend)
+   # http://<minikube-ip>:31008 (Frontend)
+   ```
+
+3. Monitor logs for issues:
+   ```bash
+   # Frontend logs
+   kubectl logs -l app=gym-management-system -c gym-frontend -n gym-system
+   
+   # Backend logs
+   kubectl logs -l app=gym-management-system -c gym-backend -n gym-system
+   ```
+
 ## Project Running Instructions
 
 ### Prerequisites
