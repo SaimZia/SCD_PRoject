@@ -8,6 +8,12 @@ services:
     ports:
       - "3000:80"
     container_name: gym-frontend
+    restart: unless-stopped
+    networks:
+      - gym-network
+    depends_on:
+      backend:
+        condition: service_healthy
 
   backend:
     build:
@@ -16,5 +22,24 @@ services:
     ports:
       - "5000:5000"
     container_name: gym-backend
+    restart: unless-stopped
     environment:
       - MONGO_URI=${MONGO_URI}
+      - NODE_ENV=production
+    networks:
+      - gym-network
+    volumes:
+      - backend-logs:/app/backend/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (res) => res.statusCode === 200 ? process.exit(0) : process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  gym-network:
+    driver: bridge
+
+volumes:
+  backend-logs:

@@ -1,0 +1,54 @@
+name: Build and Deploy to Minikube
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-deploy:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker to use Minikube's environment
+      run: |
+        echo "Configuring Docker to use Minikube's daemon..."
+        eval $(minikube docker-env)
+
+    - name: Build Frontend Docker image
+      run: |
+        docker build -t saim814/gym-frontend:latest --target frontend .
+        
+    - name: Build Backend Docker image
+      run: |
+        docker build -t saim814/gym-backend:latest --target backend .
+
+    - name: Login to Docker Hub
+      run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+    - name: Push Docker images to Docker Hub
+      run: |
+        docker push saim814/gym-frontend:latest
+        docker push saim814/gym-backend:latest
+
+    - name: Update kube config
+      run: |
+        minikube update-context
+
+    - name: Create MongoDB URI Secret
+      run: |
+        kubectl create secret generic mongodb-uri --from-literal=MONGO_URI="${{ secrets.MONGO_URI }}" -n gym-system --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy to Minikube
+      run: |
+        kubectl apply -f deployment.yaml -n gym-system
+        kubectl apply -f service.yaml -n gym-system
+
+    - name: Verify deployment
+      run: |
+        kubectl get pods -n gym-system
+        kubectl get services -n gym-system
+        kubectl get deployments -n gym-system 
